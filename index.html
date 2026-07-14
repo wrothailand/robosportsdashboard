@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>WRO Robosports Live Dashboard</title>
+  <!-- นำเข้า Font Prompt -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #f8fafc; color: #0f172a; font-family: 'Prompt', sans-serif; overflow-x: hidden; }
+    /* แถบสีแสดงประเภทสายการแข่งขันสำหรับหน้า Bracket */
+    .wro-card { border-left-width: 12px; transition: all 0.2s ease; }
+    .wro-upper-col { border-color: #2563eb; }
+    .wro-lower-col { border-color: #dc2626; }
+    .wro-final-col { border-color: #d97706; }
+    /* คลาสสำหรับการทำ Fade Animation แบบเรียบเนียน */
+    .fade-container {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+    }
+    .fade-out {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    
+    /* ซ่อน scrollbar ของ Setting Panel */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="p-4 lg:p-8 relative pt-0 lg:pt-0">
+  <!-- Progress Bar แสดงคิวเวลาถอยหลังการหมุนแท็บ -->
+  <div id="progress-bar-container" class="fixed top-0 left-0 w-full h-1.5 bg-slate-100 z-50 hidden">
+    <div id="progress-bar" class="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 w-0 transition-all ease-linear duration-100"></div>
+  </div>
+  <!-- โลโก้ขนาดใหญ่ -->
+  <div class="fixed bottom-[-100px] right-0 lg:bottom-[-150px] lg:right-2 opacity-40 hover:opacity-60 transition-opacity duration-300 pointer-events-none select-none z-30">
+    <img src="https://lh3.googleusercontent.com/d/1HIFExIn7osZ3Cc8kxJ5NF4yfiO_xvj9J" alt="WRO Logo" class="h-[350px] w-[350px] md:h-[500px] md:w-[500px] object-contain">
+  </div>
+  <!-- ส่วนประกอบที่ล็อกให้อยู่กับที่ (Sticky Container) -->
+  <div class="sticky top-0 z-40 bg-[#f8fafc] pt-4 lg:pt-8 pb-2">
+    <!-- Header คอนโทรลบอร์ดแสดงสถานะ -->
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 bg-white p-6 rounded-3xl border-2 border-slate-200 shadow-sm gap-4">
+      <div>
+        <h1 class="text-3xl lg:text-4xl font-black tracking-wide text-slate-950">WRO ROBOSPORTS LIVE DASHBOARD</h1>
+        <p class="text-base text-slate-600 font-semibold flex items-center gap-2 mt-1">
+          <span>📍 World Robot Olympiad 2026</span>
+          <span class="inline-flex items-center rounded-md bg-green-100 px-2.5 py-1 text-xs font-bold text-green-800 ring-1 ring-inset ring-green-600/20 animate-pulse">🕒 Live </span>
+        </p>
+      </div>
+      <div class="flex gap-3 w-full lg:w-auto text-base items-center">
+        <button onclick="toggleSettingPanel()" class="bg-slate-800 hover:bg-slate-900 text-white px-5 py-3 rounded-2xl font-bold transition shadow-md flex items-center gap-2 text-lg">
+          ⚙️ ตั้งค่าหน้าเว็บ
+        </button>
+        <button onclick="loadData()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-bold transition shadow-md whitespace-nowrap flex items-center gap-2 w-full lg:w-auto justify-center text-lg">
+          ⚡ Sync Score
+        </button>
+      </div>
+    </div>
+    <!-- แท็บสลับหน้าจอ -->
+    <div id="tabs-container" class="flex flex-wrap gap-2 lg:gap-4 mb-4 border-b-2 border-slate-200 pb-2 bg-[#f8fafc]">
+      <button onclick="manualSwitchTab('league-schedule')" id="tab-league-schedule" class="text-xl lg:text-2xl font-black pb-2 border-b-4 border-purple-600 text-purple-600 px-4 transition-all">📅 MATCH SCHEDULE</button>
+      <button onclick="manualSwitchTab('leaderboard')" id="tab-leaderboard" class="text-xl lg:text-2xl font-black pb-2 border-b-4 border-transparent text-slate-400 hover:text-slate-600 px-4 transition-all">📊 LEADERBOARD</button>
+      <button onclick="manualSwitchTab('round16')" id="tab-round16" class="text-xl lg:text-2xl font-black pb-2 border-b-4 border-transparent text-slate-400 hover:text-slate-600 px-4 transition-all">🏆 ROUND 16</button>
+      <button onclick="manualSwitchTab('upper')" id="tab-upper" class="text-xl lg:text-2xl font-black pb-2 border-b-4 border-transparent text-slate-400 hover:text-slate-600 px-4 transition-all">🔵 UPPER BRACKET</button>
+      <button onclick="manualSwitchTab('lower')" id="tab-lower" class="text-xl lg:text-2xl font-black pb-2 border-b-4 border-transparent text-slate-400 hover:text-slate-600 px-4 transition-all">🔴 LOWER BRACKET</button>
+    </div>
+    <!-- แถบสีม่วงของตารางลีก ล็อกให้อยู่กับที่ ไม่เลื่อนตาม Auto Scroll -->
+    <div id="sticky-schedule-header" class="w-full hidden">
+      <div class="text-center text-2xl lg:text-3xl font-black tracking-widest text-white bg-gradient-to-r from-purple-600 to-indigo-700 py-5 rounded-2xl shadow-md uppercase border-2 border-purple-400/30">
+        SCHEDULE
+      </div>
+    </div>
+  </div>
+  <!-- พื้นที่แสดงผังการแข่งขัน/ตารางคะแนน พร้อมใส่ Effect Fade -->
+  <div id="bracket-container" class="w-full py-2 min-h-[700px] fade-container">
+  </div>
+  <!-- Sidebar สำหรับ Setting Panel หลังบ้าน -->
+  <div id="setting-panel" class="fixed top-0 right-0 h-full w-80 md:w-96 bg-white shadow-2xl border-l-2 border-slate-200 z-50 translate-x-full transition-transform duration-300 ease-in-out p-6 flex flex-col justify-between overflow-y-auto no-scrollbar">
+    <div>
+      <div class="flex justify-between items-center mb-6 pb-4 border-b-2 border-slate-100">
+        <h3 class="text-xl font-black text-slate-900 flex items-center gap-2">⚙️ ตั้งค่าการควบคุมบอร์ด</h3>
+        <button onclick="toggleSettingPanel()" class="text-slate-400 hover:text-slate-600 font-bold text-2xl">&times;</button>
+      </div>
+      <!-- สวิตช์สลับการเปิดปิด วนลูปหน้าอัตโนมัติ -->
+      <div class="mb-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+        <div class="flex justify-between items-center">
+          <div>
+            <label class="font-black text-slate-800 text-base">🔄 เปิดระบบ Auto Tab / Auto Scroll</label>
+            <p class="text-xs text-slate-500 mt-0.5">เปิดเพื่อให้หน้าจอเปลี่ยนสลับและเลื่อนอัตโนมัติ</p>
+          </div>
+          <input type="checkbox" id="setting-auto" onchange="updateSettings()" class="w-5 h-5 accent-blue-600 cursor-pointer rounded">
+        </div>
+      </div>
+      <!-- รายการเปิด/ปิด แสดงผลแยกรายแท็บ -->
+      <div class="mb-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+        <label class="font-black text-slate-800 text-base block mb-2">📋 เลือกแท็บที่จะเปิดแสดงผล</label>
+        <div class="space-y-2.5 mt-2">
+          <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200">
+            <span class="text-sm font-bold text-slate-700">📅 SCHEDULE</span>
+            <input type="checkbox" id="show-tab-league-schedule" onchange="updateSettings()" class="w-4 h-4 accent-blue-600 cursor-pointer">
+          </div>
+          <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200">
+            <span class="text-sm font-bold text-slate-700">📊 LEADERBOARD</span>
+            <input type="checkbox" id="show-tab-leaderboard" onchange="updateSettings()" class="w-4 h-4 accent-blue-600 cursor-pointer">
+          </div>
+          <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200">
+            <span class="text-sm font-bold text-slate-700">🏆 ROUND 16</span>
+            <input type="checkbox" id="show-tab-round16" onchange="updateSettings()" class="w-4 h-4 accent-blue-600 cursor-pointer">
+          </div>
+          <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200">
+            <span class="text-sm font-bold text-slate-700">🔵 UPPER BRACKET</span>
+            <input type="checkbox" id="show-tab-upper" onchange="updateSettings()" class="w-4 h-4 accent-blue-600 cursor-pointer">
+          </div>
+          <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200">
+            <span class="text-sm font-bold text-slate-700">🔴 LOWER BRACKET</span>
+            <input type="checkbox" id="show-tab-lower" onchange="updateSettings()" class="w-4 h-4 accent-blue-600 cursor-pointer">
+          </div>
+        </div>
+      </div>
+      <!-- แถบสไลด์ความเร็ว Auto Scroll หน้า Schedule -->
+      <div class="mb-4 p-4 bg-purple-50 rounded-2xl border border-purple-200">
+        <div class="flex justify-between items-center mb-2">
+          <label class="font-black text-purple-900 text-base">📜 ความเร็ว Auto Scroll (Schedule)</label>
+          <span id="setting-schedule-speed-display" class="font-black text-purple-700 bg-white px-2.5 py-1 rounded-lg text-sm border border-purple-300">ปกติ (1.5x)</span>
+        </div>
+        <input type="range" id="setting-schedule-speed" min="1" max="4" value="2" step="1" oninput="updateScheduleSpeedDisplay()" onchange="updateSettings()" class="w-full accent-purple-600 cursor-pointer">
+        <div class="flex justify-between text-[11px] text-purple-600 font-bold mt-1">
+          <span>ช้าสุด</span>
+          <span>ปกติ</span>
+          <span>เร็ว</span>
+          <span>เร็วมาก</span>
+        </div>
+      </div>
+      <!-- แถบสไลด์ความเร็วหน่วงเวลาสลับแท็บ / Leaderboard / พักหน้าจอค้าง -->
+      <div class="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+        <div class="flex justify-between items-center mb-2">
+          <label class="font-black text-slate-800 text-base">⏱️ ตั้งเวลาหน่วงหน้าจอ / Leaderboard</label>
+          <span id="setting-time-display" class="font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg text-sm border border-blue-200">15 วินาที</span>
+        </div>
+        <input type="range" id="setting-time" min="5" max="60" value="15" oninput="updateTimeDisplay()" onchange="updateSettings()" class="w-full accent-blue-600 cursor-pointer">
+        <div class="flex justify-between text-[11px] text-slate-400 font-bold mt-1">
+          <span>5 วินาที</span>
+          <span>30 วินาที</span>
+          <span>60 วินาที</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="pt-4 mt-6 border-t border-slate-100 text-center">
+      <p class="text-xs font-semibold text-slate-400">WRO 2026 Scoring Display Control</p>
+    </div>
+  </div>
+  <!-- พื้นหลังมืดเวลาเปิด Panel -->
+  <div id="panel-overlay" onclick="toggleSettingPanel()" class="fixed inset-0 bg-slate-900/30 z-40 hidden backdrop-blur-xs"></div>
+  
+  <script>
+    const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwdYryRkAHJ9RlmritqchT8fP_U6GkywiO0nVPqCyKtKPU9emzNXHWKVMGIyRqAFUhahg/exec";
+
+  function loadData() {
+    // 1. เช็กว่ารันอยู่บน Google Apps Script โดยตรงหรือไม่
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(data => {
+        allMatches = data;
+        renderBracket();
+      }).getMatchesData();
+      
+    // 2. ถ้ารันอยู่ที่อื่น (เช่น บน GitHub) ให้ใช้ fetch ยิง API แทน
+    } else {
+      fetch(`${APPS_SCRIPT_WEBAPP_URL}?api=true`)
+        .then(response => response.json())
+        .then(data => {
+          allMatches = data;
+          renderBracket();
+        })
+        .catch(err => {
+          console.error("Error fetching data from Apps Script:", err);
+        });
+    }
+  }
+    let currentTab = 'league-schedule'; 
+    let allMatches = {};
+    let leaderboardPage = 0; 
+    
+    // ตั้งค่าตัวแปรเริ่มต้นของระบบลูป
+    let autoRotateActive = true;
+    let rotateIntervalSeconds = 15; 
+    let scheduleScrollSpeedVal = 2; // Default speed level 2 (1.5 px/step)
+    let rotateTimer = null;
+    let progressTimer = null;
+    let progressElapsedTime = 0;
+    const progressUpdateStep = 100; 
+    
+    const tabsOrder = ['league-schedule', 'leaderboard', 'round16', 'upper', 'lower'];
+    
+    function clearSpecialIntervals() {
+      if (window.activeScrollInterval) clearInterval(window.activeScrollInterval);
+      if (window.activeScrollTimeout1) clearTimeout(window.activeScrollTimeout1);
+      if (window.activeScrollTimeout2) clearTimeout(window.activeScrollTimeout2);
+      if (window.activeLeaderboardInterval) clearInterval(window.activeLeaderboardInterval);
+    }
+    
+    function isRealTeam(name) {
+      if (!name) return false;
+      let cleanName = name.toString().toLowerCase().trim();
+      return !cleanName.includes('match') && !cleanName.includes('tbd') && cleanName !== '-' && cleanName !== '';
+    }
+    
+    function toggleSettingPanel() {
+      const panel = document.getElementById('setting-panel');
+      const overlay = document.getElementById('panel-overlay');
+      panel.classList.toggle('translate-x-full');
+      overlay.classList.toggle('hidden');
+    }
+    
+    function updateTimeDisplay() {
+      const seconds = document.getElementById('setting-time').value;
+      document.getElementById('setting-time-display').innerText = `${seconds} วินาที`;
+    }
+    function updateScheduleSpeedDisplay() {
+      const val = document.getElementById('setting-schedule-speed').value;
+      const speedLabels = { '1': 'ช้าสุด (0.8x)', '2': 'ปกติ (1.5x)', '3': 'เร็ว (2.5x)', '4': 'เร็วมาก (3.5x)' };
+      document.getElementById('setting-schedule-speed-display').innerText = speedLabels[val] || 'ปกติ (1.5x)';
+    }
+    
+    function getActiveTabs() {
+      let active = [];
+      tabsOrder.forEach(t => {
+        if (document.getElementById(`show-tab-${t}`).checked) active.push(t);
+      });
+      if (active.length === 0) return [...tabsOrder];
+      return active;
+    }
+    
+    function updateSettings() {
+      autoRotateActive = document.getElementById('setting-auto').checked;
+      rotateIntervalSeconds = parseInt(document.getElementById('setting-time').value);
+      scheduleScrollSpeedVal = parseInt(document.getElementById('setting-schedule-speed').value);
+      
+      localStorage.setItem('wro_auto_rotate', autoRotateActive);
+      localStorage.setItem('wro_rotate_interval', rotateIntervalSeconds);
+      localStorage.setItem('wro_schedule_speed_val', scheduleScrollSpeedVal);
+      
+      tabsOrder.forEach(t => {
+        localStorage.setItem(`wro_show_${t}`, document.getElementById(`show-tab-${t}`).checked);
+        let btn = document.getElementById(`tab-${t}`);
+        if(btn) btn.classList.toggle('hidden', !document.getElementById(`show-tab-${t}`).checked);
+      });
+      
+      let activeTabs = getActiveTabs();
+      if (!activeTabs.includes(currentTab)) {
+        fadeToTab(activeTabs[0]);
+      } else {
+        initAutoRotation();
+      }
+    }
+    
+    function loadSavedSettings() {
+      const savedAuto = localStorage.getItem('wro_auto_rotate');
+      const savedInterval = localStorage.getItem('wro_rotate_interval');
+      const savedSpeed = localStorage.getItem('wro_schedule_speed_val');
+      
+      tabsOrder.forEach(t => {
+        const savedVal = localStorage.getItem(`wro_show_${t}`);
+        document.getElementById(`show-tab-${t}`).checked = (savedVal !== null) ? (savedVal === 'true') : true;
+        let btn = document.getElementById(`tab-${t}`);
+        if(btn) btn.classList.toggle('hidden', !document.getElementById(`show-tab-${t}`).checked);
+      });
+      
+      if (savedAuto !== null) autoRotateActive = (savedAuto === 'true');
+      if (savedInterval !== null) rotateIntervalSeconds = parseInt(savedInterval);
+      if (savedSpeed !== null) scheduleScrollSpeedVal = parseInt(savedSpeed);
+      
+      document.getElementById('setting-auto').checked = autoRotateActive;
+      document.getElementById('setting-time').value = rotateIntervalSeconds;
+      document.getElementById('setting-schedule-speed').value = scheduleScrollSpeedVal;
+      updateTimeDisplay();
+      updateScheduleSpeedDisplay();
+      
+      let activeTabs = getActiveTabs();
+      if (!activeTabs.includes(currentTab)) {
+        currentTab = activeTabs[0];
+      }
+    }
+    
+    function goToNextTab() {
+      let activeTabs = getActiveTabs();
+      let currentIndex = activeTabs.indexOf(currentTab);
+      if (currentIndex === -1) currentIndex = 0;
+      let nextIndex = (currentIndex + 1) % activeTabs.length;
+      fadeToTab(activeTabs[nextIndex]);
+    }
+    
+    function initAutoRotation() {
+      clearInterval(rotateTimer);
+      clearInterval(progressTimer);
+      clearSpecialIntervals();
+      
+      const progressBarContainer = document.getElementById('progress-bar-container');
+      const progressBar = document.getElementById('progress-bar');
+      
+      if (!autoRotateActive) {
+        progressBarContainer.classList.add('hidden');
+        return;
+      }
+      
+      const msDelay = rotateIntervalSeconds * 1000;
+      
+      // -----------------------------------------------------------------
+      // คิวงานที่ 1: Tab Schedule - League Phase (Auto Scroll)
+      // -----------------------------------------------------------------
+      if (currentTab === 'league-schedule') {
+        progressBarContainer.classList.add('hidden'); 
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        
+        const speedMap = { 1: 0.8, 2: 1.5, 3: 2.5, 4: 3.5 };
+        const scrollStep = speedMap[scheduleScrollSpeedVal] || 1.5;
+        
+        // หน่วงเวลาค้างด้านบนสุดตามสไลเดอร์ที่ผู้ใช้เลือก (5-60 วินาที)
+        window.activeScrollTimeout1 = setTimeout(() => {
+          if (currentTab !== 'league-schedule' || !autoRotateActive) return;
+          
+          window.activeScrollInterval = setInterval(() => {
+            let maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+            let currentY = window.scrollY || window.pageYOffset;
+            
+            if (maxScroll <= 10 || (currentY + window.innerHeight >= document.documentElement.scrollHeight - 10)) {
+              clearInterval(window.activeScrollInterval);
+              
+              // หน่วงเวลาค้างด้านล่างสุดตามสไลเดอร์ที่ผู้ใช้เลือก (5-60 วินาที) แล้วไปแท็บถัดไป
+              window.activeScrollTimeout2 = setTimeout(() => {
+                if (currentTab === 'league-schedule' && autoRotateActive) goToNextTab();
+              }, msDelay);
+            } else {
+              window.scrollBy(0, scrollStep);
+            }
+          }, 30);
+          
+        }, msDelay);
+        return;
+      }
+      
+      // -----------------------------------------------------------------
+      // คิวงานที่ 2: Tab Leaderboard (เปลี่ยนหน้าละ 16 ทีม / ตามสไลเดอร์วินาที)
+      // -----------------------------------------------------------------
+      if (currentTab === 'leaderboard') {
+        progressBarContainer.classList.add('hidden');
+        let totalTeams = allMatches.leaderboard ? allMatches.leaderboard.length : 0;
+        let totalPages = Math.ceil(totalTeams / 16);
+        if (totalPages === 0) totalPages = 1;
+        
+        window.activeLeaderboardInterval = setInterval(() => {
+          if (currentTab !== 'leaderboard' || !autoRotateActive) {
+            clearInterval(window.activeLeaderboardInterval);
+            return;
+          }
+          leaderboardPage++;
+          if (leaderboardPage < totalPages) {
+            renderBracket();
+          } else {
+            clearInterval(window.activeLeaderboardInterval);
+            goToNextTab();
+          }
+        }, msDelay); 
+        return;
+      }
+      
+      // -----------------------------------------------------------------
+      // คิวงานแท็บอื่นๆ (ลูปตามเวลาทั่วไปจากสไลเดอร์)
+      // -----------------------------------------------------------------
+      progressBarContainer.classList.remove('hidden');
+      progressElapsedTime = 0;
+      progressBar.style.width = '0%';
+      
+      progressTimer = setInterval(() => {
+        progressElapsedTime += progressUpdateStep;
+        let percentage = (progressElapsedTime / msDelay) * 100;
+        progressBar.style.width = `${percentage}%`;
+        if (progressElapsedTime >= msDelay) progressElapsedTime = 0;
+      }, progressUpdateStep);
+      
+      rotateTimer = setInterval(() => {
+        goToNextTab();
+      }, msDelay);
+    }
+    function manualSwitchTab(tab) {
+      if (tab === 'leaderboard') leaderboardPage = 0; 
+      fadeToTab(tab);
+      if (autoRotateActive) initAutoRotation(); 
+    }
+    function fadeToTab(tab) {
+      const container = document.getElementById('bracket-container');
+      container.classList.add('fade-out'); 
+      clearSpecialIntervals();
+      
+      setTimeout(() => {
+        currentTab = tab;
+        
+        // จัดการเปิด/ปิด แถบสีม่วงแบบ Sticky
+        const stickyHeader = document.getElementById('sticky-schedule-header');
+        if (tab === 'league-schedule') {
+          stickyHeader.classList.remove('hidden');
+        } else {
+          stickyHeader.classList.add('hidden');
+        }
+        tabsOrder.forEach(t => {
+          let btn = document.getElementById(`tab-${t}`);
+          if (btn) {
+            if (t === tab) {
+              let color = 'border-slate-800 text-slate-900';
+              if (t === 'upper') color = 'border-blue-600 text-blue-600';
+              if (t === 'lower') color = 'border-red-600 text-red-600';
+              if (t === 'league-schedule') color = 'border-purple-600 text-purple-600';
+              if (t === 'leaderboard') color = 'border-emerald-600 text-emerald-600';
+              btn.className = `text-xl lg:text-2xl font-black pb-2 border-b-4 ${color} px-4 transition-all`;
+            } else {
+              btn.className = 'text-xl lg:text-2xl font-black pb-2 border-b-4 border-transparent text-slate-400 hover:text-slate-600 px-4 transition-all';
+            }
+            btn.classList.toggle('hidden', !document.getElementById(`show-tab-${t}`).checked);
+          }
+        });
+        renderBracket();
+        container.classList.remove('fade-out');
+        
+        if (autoRotateActive) {
+          initAutoRotation();
+        }
+      }, 400); 
+    }
+    function loadData() {
+      google.script.run.withSuccessHandler(data => {
+        allMatches = data;
+        renderBracket();
+      }).getMatchesData();
+    }
+    function changeLeaderboardPage(direction) {
+      let lbData = allMatches.leaderboard || [];
+      let totalPages = Math.ceil(lbData.length / 16) || 1;
+      leaderboardPage += direction;
+      if (leaderboardPage < 0) leaderboardPage = 0;
+      if (leaderboardPage >= totalPages) leaderboardPage = totalPages - 1;
+      
+      renderBracket();
+      if (autoRotateActive) initAutoRotation(); 
+    }
+    function renderBracket() {
+      const container = document.getElementById('bracket-container');
+      container.innerHTML = '';
+      
+      // ==========================================================
+      // TAB 1: SCHEDULE – LEAGUE PHASE
+      // ==========================================================
+      if (currentTab === 'league-schedule') {
+        container.className = "w-full py-2 flex flex-col items-center fade-container";
+        
+        let tableWrapper = document.createElement('div');
+        tableWrapper.className = "w-full bg-white rounded-3xl border-2 border-slate-200 shadow-md p-4 lg:p-8 space-y-4 relative mt-2";
+        
+        let sData = allMatches.leagueSchedule || allMatches.schedule || [];
+        if (sData.length === 0) {
+          tableWrapper.innerHTML += `<div class="text-center p-12 text-slate-400 font-bold text-xl">⏳ ไม่พบข้อมูลหรือกำลังเชื่อมข้อมูลจากตาราง Team Data...</div>`;
+        } else {
+          sData.forEach(m => {
+            let chkRed = isRealTeam(m.teamRed);
+            let chkBlue = isRealTeam(m.teamBlue);
+            
+            let fRed = m.foulRed !== undefined ? m.foulRed : (m.foulR !== undefined ? m.foulR : '');
+            let fBlue = m.foulBlue !== undefined ? m.foulBlue : (m.foulB !== undefined ? m.foulB : '');
+            let sRed = m.scoreRed !== undefined ? m.scoreRed : (m.scoreR !== undefined ? m.scoreR : '');
+            let sBlue = m.scoreBlue !== undefined ? m.scoreBlue : (m.scoreB !== undefined ? m.scoreB : '');
+            
+            let dispRed = m.teamRed || '-';
+            if (fRed !== '' && fRed !== undefined && fRed !== null && chkRed) dispRed += ` (${fRed})`;
+            
+            let dispBlue = m.teamBlue || '-';
+            if (fBlue !== '' && fBlue !== undefined && fBlue !== null && chkBlue) {
+              // สลับให้วงเล็บฟาวล์มาอยู่ด้านหน้าชื่อทีม แล้วเคาะ 1 สเปซบาร์
+              dispBlue = `(${fBlue}) ` + dispBlue; 
+            }
+            
+            // แทนที่เครื่องหมาย / ด้วย | สำหรับคะแนนรอบย่อย
+            let formatRedGames = (m.redGamesDetails || '').split(' / ').join(' | ');
+            let formatBlueGames = (m.blueGamesDetails || '').split(' / ').join(' | ');
+            
+            let redBg = chkRed ? "bg-red-50 border-2 border-red-200/80 p-3 rounded-2xl" : "p-3";
+            let blueBg = chkBlue ? "bg-blue-50 border-2 border-blue-200/80 p-3 rounded-2xl" : "p-3";
+            
+            let row = document.createElement('div');
+            row.className = "flex flex-col lg:flex-row items-center justify-between gap-4 p-5 rounded-2xl border-2 border-slate-200 bg-slate-50/50 hover:border-purple-300 hover:bg-white transition shadow-xs";
+            
+            row.innerHTML = `
+              <div class="w-full lg:w-60 shrink-0 flex lg:flex-col items-center lg:items-start justify-between lg:justify-center gap-2">
+                <span class="text-base font-black text-purple-800 bg-purple-100 border border-purple-300 px-3 py-1 rounded-xl tracking-wide">MATCH ${m.matchNo}</span>
+                <span class="text-sm font-bold text-slate-600 truncate max-w-[200px]">${m.round || '-'}</span>
+                <span class="text-xs font-black text-slate-700 bg-slate-200 px-2.5 py-1 rounded-lg border border-slate-300">${m.field}</span>
+              </div>
+              
+              <!-- กล่องทีมสีแดง -->
+              <div class="flex-1 w-full flex flex-col items-center lg:items-end justify-center min-w-0 ${redBg}">
+                <div class="truncate w-full text-center lg:text-right">
+                  <span class="text-slate-900 font-extrabold text-lg lg:text-xl">${dispRed}</span>
+                  <span class="text-white bg-red-600 px-2 py-0.5 rounded-md font-black ml-2 text-xs shadow-xs">R</span>
+                </div>
+                <!-- แถบคะแนนรอบย่อยทีมแดง -->
+                <div class="text-xs font-bold text-red-600/90 mt-1 text-center lg:text-right w-full truncate tracking-wide">${formatRedGames}</div>
+              </div>
+              
+              <div class="flex items-center gap-3 shrink-0 px-3">
+                <span class="bg-white px-4 py-2 rounded-2xl font-mono font-black text-slate-950 border-2 border-slate-300 text-2xl lg:text-3xl min-w-[65px] text-center shadow-inner">${sRed !== '' ? sRed : '-'}</span>
+                <span class="text-slate-400 font-black text-base">VS</span>
+                <span class="bg-white px-4 py-2 rounded-2xl font-mono font-black text-slate-950 border-2 border-slate-300 text-2xl lg:text-3xl min-w-[65px] text-center shadow-inner">${sBlue !== '' ? sBlue : '-'}</span>
+              </div>
+              
+              <!-- กล่องทีมน้ำเงิน -->
+              <div class="flex-1 w-full flex flex-col items-center lg:items-start justify-center min-w-0 ${blueBg}">
+                <div class="truncate w-full text-center lg:text-left">
+                  <span class="text-white bg-blue-600 px-2 py-0.5 rounded-md font-black mr-2 text-xs shadow-xs">B</span>
+                  <span class="text-slate-900 font-extrabold text-lg lg:text-xl">${dispBlue}</span>
+                </div>
+                <!-- แถบคะแนนรอบย่อยทีมน้ำเงิน -->
+                <div class="text-xs font-bold text-blue-600/90 mt-1 text-center lg:text-left w-full truncate tracking-wide">${formatBlueGames}</div>
+              </div>
+            `;
+            tableWrapper.appendChild(row);
+          });
+        }
+        container.appendChild(tableWrapper);
+        return;
+      }
+      // ==========================================================
+      // TAB 2: LEADERBOARD
+      // ==========================================================
+      if (currentTab === 'leaderboard') {
+        container.className = "w-full py-2 flex flex-col items-center fade-container";
+        
+        let lbData = allMatches.leaderboard || [];
+        let totalTeams = lbData.length;
+        let totalPages = Math.ceil(totalTeams / 16);
+        if(totalPages === 0) totalPages = 1;
+        
+        if(leaderboardPage >= totalPages) leaderboardPage = 0;
+        
+        let startIdx = leaderboardPage * 16;
+        let endIdx = startIdx + 16;
+        let currentPageData = lbData.slice(startIdx, endIdx);
+        
+        let tableWrapper = document.createElement('div');
+        tableWrapper.className = "w-full bg-white rounded-3xl border-2 border-slate-200 shadow-md p-4 lg:p-6 overflow-hidden flex flex-col justify-between min-h-[720px]";
+        
+        let topSection = document.createElement('div');
+        
+        let tableTitle = document.createElement('div');
+        tableTitle.className = "text-center text-2xl lg:text-3xl font-black tracking-widest text-white bg-gradient-to-r from-emerald-600 to-teal-700 py-4.5 rounded-2xl shadow-sm mb-6 flex justify-between items-center px-6";
+        tableTitle.innerHTML = `
+          <span>LEADERBOARD</span>
+          <span class="bg-white/20 px-4 py-1.5 rounded-xl text-base font-bold">หน้า ${leaderboardPage + 1} / ${totalPages}</span>
+        `;
+        topSection.appendChild(tableTitle);
+        if (lbData.length === 0) {
+          topSection.innerHTML += `<div class="text-center p-12 text-slate-400 font-bold text-xl">⏳ กำลังโหลดตารางสรุปผลคะแนนจากชีต Formula...</div>`;
+        } else {
+          let tableResponsive = document.createElement('div');
+          tableResponsive.className = "overflow-x-auto w-full";
+          
+          let table = document.createElement('table');
+          table.className = "w-full text-left border-collapse";
+          
+          table.innerHTML = `
+            <thead>
+              <tr class="bg-slate-100 text-slate-800 font-black text-base lg:text-lg border-b-2 border-slate-300">
+                <th class="p-3.5 text-center w-16 rounded-l-xl">Rank</th>
+                <th class="p-3.5">Team</th>
+                <th class="p-3.5 text-center w-20">Played</th>
+                <th class="p-3.5 text-center w-20 text-emerald-600">Win</th>
+                <th class="p-3.5 text-center w-20 text-amber-600">Draw</th>
+                <th class="p-3.5 text-center w-20 text-red-600">Lose</th>
+                <th class="p-3.5 text-center w-24">Ball For</th>
+                <th class="p-3.5 text-center w-24">Fouls</th>
+                <th class="p-3.5 text-center w-24 text-slate-950 rounded-r-xl">Point</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 font-medium text-slate-900 text-base lg:text-xl">
+            </tbody>
+          `;
+          
+          let tbody = table.querySelector('tbody');
+          
+          currentPageData.forEach(row => {
+            let tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+            
+            let rank = row[0] !== undefined ? row[0] : (row.colA !== undefined ? row.colA : '-');
+            let teamName = row[1] !== undefined ? row[1] : (row.colB !== undefined ? row.colB : '-');
+            let played = row[2] !== undefined ? row[2] : (row.colC !== undefined ? row.colC : '-');
+            let win = row[3] !== undefined ? row[3] : (row.colD !== undefined ? row.colD : '-');
+            let draw = row[4] !== undefined ? row[4] : (row.colE !== undefined ? row.colE : '-');
+            let loss = row[5] !== undefined ? row[5] : (row.colF !== undefined ? row.colF : '-');
+            let points = row[6] !== undefined ? row[6] : (row.colG !== undefined ? row.colG : '-');
+            let ballFor = row[7] !== undefined ? row[7] : (row.colH !== undefined ? row.colH : '-');
+            let fouls = row[8] !== undefined ? row[8] : (row.colI !== undefined ? row.colI : '-');
+            tr.innerHTML = `
+              <td class="p-3.5 text-center font-black text-slate-800">${rank}</td>
+              <td class="p-3.5 font-bold text-slate-950 max-w-[280px] truncate">${teamName}</td>
+              <td class="p-3.5 text-center font-mono font-bold">${played}</td>
+              <td class="p-3.5 text-center font-mono font-extrabold text-emerald-600">${win}</td>
+              <td class="p-3.5 text-center font-mono font-bold text-amber-600">${draw}</td>
+              <td class="p-3.5 text-center font-mono font-bold text-red-500">${loss}</td>
+              <td class="p-3.5 text-center font-mono ont-bold text-slate-600">${points}</td>
+              <td class="p-3.5 text-center font-mono font-bold text-slate-600">${ballFor}</td>
+              <td class="p-3.5 text-center font-mono font-black text-slate-950 bg-slate-100/70">${fouls}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+          tableResponsive.appendChild(table);
+          topSection.appendChild(tableResponsive);
+        }
+        
+        tableWrapper.appendChild(topSection);
+        let bottomNav = document.createElement('div');
+        bottomNav.className = "flex justify-between items-center mt-6 pt-4 border-t-2 border-slate-100";
+        bottomNav.innerHTML = `
+          <button onclick="changeLeaderboardPage(-1)" id="btn-lb-prev" class="bg-slate-800 hover:bg-slate-900 text-white text-base lg:text-lg font-bold px-6 py-2.5 rounded-2xl transition shadow-md disabled:opacity-30 disabled:pointer-events-none">◀ หน้าก่อนหน้า</button>
+          <span class="text-slate-600 font-bold text-sm lg:text-base">แสดงอันดับที่ ${startIdx + 1} - ${Math.min(endIdx, totalTeams)} จากทั้งหมด ${totalTeams} ทีม</span>
+          <button onclick="changeLeaderboardPage(1)" id="btn-lb-next" class="bg-slate-800 hover:bg-slate-900 text-white text-base lg:text-lg font-bold px-6 py-2.5 rounded-2xl transition shadow-md disabled:opacity-30 disabled:pointer-events-none">หน้าถัดไป ▶</button>
+        `;
+        tableWrapper.appendChild(bottomNav);
+        let btnPrev = tableWrapper.querySelector('#btn-lb-prev');
+        let btnNext = tableWrapper.querySelector('#btn-lb-next');
+        if (btnPrev) btnPrev.disabled = (leaderboardPage === 0);
+        if (btnNext) btnNext.disabled = (leaderboardPage >= totalPages - 1);
+        container.appendChild(tableWrapper);
+        return;
+      }
+      // ==========================================================
+      // TAB 3: ROUND 16
+      // ==========================================================
+      if (currentTab === 'round16') {
+        container.className = "w-full py-2 flex flex-col items-center fade-container";
+        
+        let tableWrapper = document.createElement('div');
+        tableWrapper.className = "w-full bg-white rounded-3xl border-2 border-slate-200 shadow-md p-4 lg:p-8 space-y-4";
+        
+        let tableTitle = document.createElement('div');
+        tableTitle.className = "text-center text-2xl lg:text-3xl font-black tracking-widest text-white bg-gradient-to-r from-slate-800 to-slate-950 py-4.5 rounded-2xl shadow-sm mb-6 uppercase";
+        tableTitle.innerText = "ROUND OF 16";
+        tableWrapper.appendChild(tableTitle);
+        let matchIds = ["81","82","83","84","85","86","87","88"];
+        
+        matchIds.forEach(id => {
+          let m = allMatches[id] || {id: id, field: '-', teamA: 'TBD', teamB: 'TBD', scoreA:'', scoreB:'', foulA:'', foulB:''};
+          let displayTeamA = m.teamA;
+          if (m.foulA !== undefined && m.foulA !== null && m.foulA !== '' && isRealTeam(m.teamA)) displayTeamA += ` (${m.foulA})`;
+          let displayTeamB = m.teamB;
+          // ปรับตำแหน่งฟาวล์ของทีมสีน้ำเงินในหน้า Round 16
+          if (m.foulB !== undefined && m.foulB !== null && m.foulB !== '' && isRealTeam(m.teamB)) {
+            displayTeamB = `(${m.foulB}) ` + displayTeamB;
+          }
+          
+          let checkA = isRealTeam(m.teamA);
+          let checkB = isRealTeam(m.teamB);
+          let teamA_Bg = checkA ? "bg-red-50 border-2 border-red-200/70 p-3 rounded-2xl" : "bg-slate-50/40 p-3 rounded-2xl border border-transparent";
+          let teamB_Bg = checkB ? "bg-blue-50 border-2 border-blue-200/70 p-3 rounded-2xl" : "bg-slate-50/40 p-3 rounded-2xl border border-transparent";
+          let row = document.createElement('div');
+          row.className = "flex flex-col md:flex-row items-center justify-between gap-4 p-5 rounded-2xl border-2 border-slate-100 bg-white hover:border-slate-300 transition shadow-xs";
+          row.innerHTML = `
+            <div class="w-full md:w-36 shrink-0 flex md:flex-col items-center md:items-start justify-between md:justify-center gap-2">
+              <span class="text-sm font-black text-slate-800 bg-slate-100 border-2 border-slate-300 px-3 py-1 rounded-xl shadow-xs tracking-wide">MATCH ${m.id}</span>
+              <span class="text-xs font-black text-slate-600 bg-slate-200/80 px-2.5 py-1 rounded-lg border border-slate-300">${m.field}</span>
+            </div>
+            <div class="flex-1 w-full text-center md:text-right truncate ${teamA_Bg} transition">
+              <span class="${m.winner === m.teamA && checkA ? 'text-emerald-600 font-black text-2xl' : 'text-slate-900 font-extrabold text-xl'}">${displayTeamA}</span>
+              <span class="text-white bg-red-600 px-2 py-0.5 rounded-lg font-black ml-2 text-xs shadow-sm">R</span>
+            </div>
+            <div class="flex items-center gap-3 shrink-0 px-4 py-2 md:py-0">
+              <span class="bg-slate-50 px-4 py-2 rounded-2xl font-mono font-black text-slate-950 border-2 border-slate-300 text-2xl min-w-[60px] text-center shadow-inner">${m.scoreA !== undefined && m.scoreA !== '' ? m.scoreA : '-'}</span>
+              <span class="text-slate-400 font-black text-xl">:</span>
+              <span class="bg-slate-50 px-4 py-2 rounded-2xl font-mono font-black text-slate-950 border-2 border-slate-300 text-2xl min-w-[60px] text-center shadow-inner">${m.scoreB !== undefined && m.scoreB !== '' ? m.scoreB : '-'}</span>
+            </div>
+            <div class="flex-1 w-full text-center md:text-left truncate ${teamB_Bg} transition">
+              <span class="text-white bg-blue-600 px-2 py-0.5 rounded-lg font-black mr-2 text-xs shadow-sm">B</span>
+              <span class="${m.winner === m.teamB && checkB ? 'text-emerald-600 font-black text-2xl' : 'text-slate-900 font-extrabold text-xl'}">${displayTeamB}</span>
+            </div>
+          `;
+          tableWrapper.appendChild(row);
+        });
+        container.appendChild(tableWrapper);
+        return;
+      }
+      // ==========================================================
+      // TAB 4 & 5: BRACKETS (UPPER / LOWER)
+      // ==========================================================
+      container.className = "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 w-full fade-container";
+      let columns = [];
+      let isUpper = (currentTab === 'upper');
+      
+      if (isUpper) {
+        columns = [
+          [ { name: "Upper Round 2", matches: ["93","94","95","96"] } ],
+          [ { name: "Upper Round 3", matches: ["101","102"] } ],
+          [ { name: "Upper Round 4", matches: ["105"] } ],
+          [ { name: "Grand Final", matches: ["110"] } ]
+        ];
+      } else {
+        columns = [
+          [ { name: "Lower Round 1", matches: ["89","90","91","92"] } ],
+          [ { name: "Lower Round 2", matches: ["97","98","99","100"] } ],
+          [ { name: "Lower Round 3", matches: ["103","104"] }, { name: "Lower Round 5", matches: ["108"] } ],
+          [ { name: "Lower Round 4", matches: ["106","107"] }, { name: "Lower Round 6", matches: ["109"] } ]
+        ];
+      }
+      columns.forEach(colGroups => {
+        let col = document.createElement('div');
+        col.className = "w-full flex flex-col gap-6 justify-start";
+        colGroups.forEach((r, groupIdx) => {
+          let groupContainer = document.createElement('div');
+          groupContainer.className = "flex flex-col gap-4" + (groupIdx > 0 ? " mt-8 pt-6 border-t-4 border-dashed border-slate-300" : "");
+          let colTitle = document.createElement('h4');
+          let headerColorClass = isUpper ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white" : "bg-gradient-to-r from-red-600 to-rose-600 text-white";
+          if (r.name === "Grand Final") headerColorClass = "bg-gradient-to-r from-amber-500 to-amber-600 text-white";
+          
+          colTitle.className = `text-center text-lg font-black tracking-widest py-3 rounded-xl shadow-sm uppercase ${headerColorClass}`;
+          colTitle.innerText = r.name;
+          groupContainer.appendChild(colTitle);
+          r.matches.forEach(id => {
+            let m = allMatches[id] || {id: id, field: '-', teamA: 'TBD', teamB: 'TBD', scoreA:'', scoreB:'', foulA:'', foulB:''};
+            let box = document.createElement('div');
+            let typeClass = (id === "110") ? "wro-final-col" : (isUpper ? "wro-upper-col" : "wro-lower-col");
+            box.className = `bg-white border-[3px] border-slate-200 ${typeClass} wro-card rounded-2xl p-5 shadow-md hover:shadow-lg transition`;
+            
+            let displayTeamA = m.teamA;
+            if (m.foulA !== undefined && m.foulA !== null && m.foulA !== '' && isRealTeam(m.teamA)) displayTeamA += ` (${m.foulA})`;
+            
+            let displayTeamB = m.teamB;
+            // ปรับตำแหน่งฟาวล์ของทีมสีน้ำเงินในหน้า Bracket
+            if (m.foulB !== undefined && m.foulB !== null && m.foulB !== '' && isRealTeam(m.teamB)) {
+              displayTeamB = `(${m.foulB}) ` + displayTeamB;
+            }
+            
+            let checkA = isRealTeam(m.teamA);
+            let checkB = isRealTeam(m.teamB);
+            let rowA_Bg = checkA ? "bg-red-50/90 border border-red-200/80 px-3 py-2.5 rounded-xl" : "px-3 py-2.5 rounded-xl";
+            let rowB_Bg = checkB ? "bg-blue-50/90 border border-blue-200/80 px-3 py-2.5 rounded-xl" : "px-3 py-2.5 rounded-xl";
+            
+            box.innerHTML = `
+              <div class="flex justify-between items-center text-base lg:text-lg font-black mb-4 bg-slate-100 p-3 rounded-xl border border-slate-200 text-slate-800">
+                <span class="tracking-wide">MATCH NO. ${m.id}</span>
+                <span class="bg-white text-slate-800 px-3 py-0.5 rounded-md font-black border border-slate-300">${m.field}</span>
+              </div>
+              <div class="flex justify-between items-center gap-3 mb-3 transition ${rowA_Bg}">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                  <span class="text-white bg-red-500 px-2 py-0.5 rounded-md font-black text-xs shrink-0">R</span>
+                  <span class="truncate font-bold text-xl lg:text-2xl ${m.winner === m.teamA && checkA ? 'text-emerald-600 font-black text-2xl' : 'text-slate-900'}">${displayTeamA}</span>
+                </div>
+                <span class="bg-slate-50 px-3.5 py-1 rounded-xl font-mono font-black text-slate-950 border-2 border-slate-300 text-lg min-w-[46px] text-center shadow-inner">${m.scoreA !== undefined && m.scoreA !== '' ? m.scoreA : '-'}</span>
+              </div>
+              <div class="flex justify-between items-center gap-3 transition ${rowB_Bg}">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                  <span class="text-white bg-blue-500 px-2 py-0.5 rounded-md font-black text-xs shrink-0">B</span>
+                  <span class="truncate font-bold text-xl lg:text-2xl ${m.winner === m.teamB && checkB ? 'text-emerald-600 font-black text-2xl' : 'text-slate-900'}">${displayTeamB}</span>
+                </div>
+                <span class="bg-slate-50 px-3.5 py-1 rounded-xl font-mono font-black text-slate-950 border-2 border-slate-300 text-lg min-w-[46px] text-center shadow-inner">${m.scoreB !== undefined && m.scoreB !== '' ? m.scoreB : '-'}</span>
+              </div>
+            `;
+            groupContainer.appendChild(box);
+          });
+          col.appendChild(groupContainer);
+        });
+        container.appendChild(col);
+      });
+    }
+    window.onload = function() {
+      loadSavedSettings(); 
+      loadData();          
+      initAutoRotation();  
+      setInterval(loadData, 60000); 
+    };
+  </script>
+</body>
+</html>

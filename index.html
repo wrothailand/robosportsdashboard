@@ -161,13 +161,22 @@
   <script>
     const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwdYryRkAHJ9RlmritqchT8fP_U6GkywiO0nVPqCyKtKPU9emzNXHWKVMGIyRqAFUhahg/exec?api=true";
 
-  // ปรับปรุงฟังก์ชัน loadData ใน Index.html
-function loadData() {
-    // ใช้ fetch ดึงข้อมูลเสมอ โดยไม่ต้องสนว่า google object จะมีไหม
-    // วิธีนี้ปลอดภัยที่สุดสำหรับ GitHub Pages
+    function loadData() {
+  // 1. เช็กว่ารันอยู่ใน Apps Script หรือไม่
+  const isGAS = (typeof google !== 'undefined' && google.script && google.script.run);
+
+  if (isGAS) {
+    // กรณีรันใน Apps Script (ใช้ google.script.run)
+    google.script.run.withSuccessHandler(data => {
+      allMatches = data;
+      renderBracket();
+    }).getMatchesData();
+  } else {
+    // 2. กรณีรันบน GitHub (ใช้ fetch)
+    // เติม ?api=true เข้าไปแค่จุดนี้จุดเดียว
     fetch(`${APPS_SCRIPT_WEBAPP_URL}?api=true`)
       .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
+        if (!response.ok) throw new Error('Network response not ok');
         return response.json();
       })
       .then(data => {
@@ -178,9 +187,11 @@ function loadData() {
       .catch(err => {
         console.error("Error fetching data:", err);
         document.getElementById('bracket-container').innerHTML = 
-          `<p class="text-center text-red-500 pt-10">ไม่สามารถดึงข้อมูลได้: ${err.message}<br>โปรดตรวจสอบ URL ของ Apps Script ในโค้ด</p>`;
+          `<p class="text-center text-red-500 pt-10">ไม่สามารถเชื่อมต่อข้อมูลได้: ${err.message}</p>`;
       });
   }
+}
+
     let currentTab = 'league-schedule'; 
     let allMatches = {};
     let leaderboardPage = 0; 
@@ -430,12 +441,7 @@ function loadData() {
         }
       }, 400); 
     }
-    function loadData() {
-      google.script.run.withSuccessHandler(data => {
-        allMatches = data;
-        renderBracket();
-      }).getMatchesData();
-    }
+
     function changeLeaderboardPage(direction) {
       let lbData = allMatches.leaderboard || [];
       let totalPages = Math.ceil(lbData.length / 16) || 1;

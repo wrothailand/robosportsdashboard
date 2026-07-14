@@ -159,16 +159,12 @@
   <div id="panel-overlay" onclick="toggleSettingPanel()" class="fixed inset-0 bg-slate-900/30 z-40 hidden backdrop-blur-xs"></div>
   
   <script>
-    const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwdYryRkAHJ9RlmritqchT8fP_U6GkywiO0nVPqCyKtKPU9emzNXHWKVMGIyRqAFUhahg/exec";
+    const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwdYryRkAHJ9RlmritqchT8fP_U6GkywiO0nVPqCyKtKPU9emzNXHWKVMGIyRqAFUhahg/exec?api=true";
 
   // ปรับปรุงฟังก์ชัน loadData ใน Index.html
 function loadData() {
-  if (typeof google !== 'undefined' && google.script && google.script.run) {
-    google.script.run.withSuccessHandler(data => {
-      allMatches = data;
-      renderBracket();
-    }).getMatchesData();
-  } else {
+    // ใช้ fetch ดึงข้อมูลเสมอ โดยไม่ต้องสนว่า google object จะมีไหม
+    // วิธีนี้ปลอดภัยที่สุดสำหรับ GitHub Pages
     fetch(`${APPS_SCRIPT_WEBAPP_URL}?api=true`)
       .then(response => {
         if (!response.ok) throw new Error('Network response was not ok');
@@ -177,15 +173,14 @@ function loadData() {
       .then(data => {
         allMatches = data;
         renderBracket();
+        console.log("Data loaded successfully from GitHub!");
       })
       .catch(err => {
         console.error("Error fetching data:", err);
-        // แสดงข้อความในหน้าจอให้รู้ว่าโหลดไม่ได้
         document.getElementById('bracket-container').innerHTML = 
-          `<p class="text-center text-red-500">ไม่สามารถดึงข้อมูลได้ (โปรดเช็กสิทธิ์การ Deploy ใน Apps Script)</p>`;
+          `<p class="text-center text-red-500 pt-10">ไม่สามารถดึงข้อมูลได้: ${err.message}<br>โปรดตรวจสอบ URL ของ Apps Script ในโค้ด</p>`;
       });
   }
-}
     let currentTab = 'league-schedule'; 
     let allMatches = {};
     let leaderboardPage = 0; 

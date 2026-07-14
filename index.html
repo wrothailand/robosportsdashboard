@@ -161,27 +161,31 @@
   <script>
     const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwdYryRkAHJ9RlmritqchT8fP_U6GkywiO0nVPqCyKtKPU9emzNXHWKVMGIyRqAFUhahg/exec";
 
-  function loadData() {
-    // 1. เช็กว่ารันอยู่บน Google Apps Script โดยตรงหรือไม่
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(data => {
+  // ปรับปรุงฟังก์ชัน loadData ใน Index.html
+function loadData() {
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run.withSuccessHandler(data => {
+      allMatches = data;
+      renderBracket();
+    }).getMatchesData();
+  } else {
+    fetch(`${APPS_SCRIPT_WEBAPP_URL}?api=true`)
+      .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+      })
+      .then(data => {
         allMatches = data;
         renderBracket();
-      }).getMatchesData();
-      
-    // 2. ถ้ารันอยู่ที่อื่น (เช่น บน GitHub) ให้ใช้ fetch ยิง API แทน
-    } else {
-      fetch(`${APPS_SCRIPT_WEBAPP_URL}?api=true`)
-        .then(response => response.json())
-        .then(data => {
-          allMatches = data;
-          renderBracket();
-        })
-        .catch(err => {
-          console.error("Error fetching data from Apps Script:", err);
-        });
-    }
+      })
+      .catch(err => {
+        console.error("Error fetching data:", err);
+        // แสดงข้อความในหน้าจอให้รู้ว่าโหลดไม่ได้
+        document.getElementById('bracket-container').innerHTML = 
+          `<p class="text-center text-red-500">ไม่สามารถดึงข้อมูลได้ (โปรดเช็กสิทธิ์การ Deploy ใน Apps Script)</p>`;
+      });
   }
+}
     let currentTab = 'league-schedule'; 
     let allMatches = {};
     let leaderboardPage = 0; 

@@ -159,38 +159,37 @@
   <div id="panel-overlay" onclick="toggleSettingPanel()" class="fixed inset-0 bg-slate-900/30 z-40 hidden backdrop-blur-xs"></div>
   
   <script>
-    const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwdYryRkAHJ9RlmritqchT8fP_U6GkywiO0nVPqCyKtKPU9emzNXHWKVMGIyRqAFUhahg/exec?api=true";
+   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwdYryRkAHJ9RlmritqchT8fP_U6GkywiO0nVPqCyKtKPU9emzNXHWKVMGIyRqAFUhahg/exec";
 
-    function loadData() {
-  // 1. เช็กว่ารันอยู่ใน Apps Script หรือไม่
-  const isGAS = (typeof google !== 'undefined' && google.script && google.script.run);
+  function loadData() {
+    // 1. เช็กว่ารันอยู่ในสภาพแวดล้อม GAS หรือไม่
+    const isGAS = (typeof google !== 'undefined' && google.script && google.script.run);
 
-  if (isGAS) {
-    // กรณีรันใน Apps Script (ใช้ google.script.run)
-    google.script.run.withSuccessHandler(data => {
-      allMatches = data;
-      renderBracket();
-    }).getMatchesData();
-  } else {
-    // 2. กรณีรันบน GitHub (ใช้ fetch)
-    // เติม ?api=true เข้าไปแค่จุดนี้จุดเดียว
-    fetch(`${APPS_SCRIPT_WEBAPP_URL}?api=true`)
-      .then(response => {
-        if (!response.ok) throw new Error('Network response not ok');
-        return response.json();
-      })
-      .then(data => {
+    if (isGAS) {
+      google.script.run.withSuccessHandler(data => {
         allMatches = data;
         renderBracket();
-        console.log("Data loaded successfully from GitHub!");
-      })
-      .catch(err => {
-        console.error("Error fetching data:", err);
-        document.getElementById('bracket-container').innerHTML = 
-          `<p class="text-center text-red-500 pt-10">ไม่สามารถเชื่อมต่อข้อมูลได้: ${err.message}</p>`;
-      });
+      }).getMatchesData();
+    } else {
+      // 2. ถ้าอยู่บน GitHub ให้ fetch โดยเพิ่ม ?api=true เพียงครั้งเดียว
+      fetch(APPS_SCRIPT_WEBAPP_URL + "?api=true")
+        .then(response => {
+          if (!response.ok) throw new Error('Status: ' + response.status);
+          return response.json();
+        })
+        .then(data => {
+          allMatches = data;
+          renderBracket();
+          console.log("Data loaded successfully!");
+        })
+        .catch(err => {
+          console.error("Fetch Error:", err);
+          document.getElementById('bracket-container').innerHTML = 
+            `<p class="text-center text-red-500 pt-10">ไม่สามารถดึงข้อมูลได้: ${err.message}<br>
+            (ตรวจสอบว่า Deploy แบบ "Anyone" และเป็น "New Version" แล้วหรือยัง)</p>`;
+        });
+    }
   }
-}
 
     let currentTab = 'league-schedule'; 
     let allMatches = {};
@@ -778,10 +777,10 @@
       });
     }
     window.onload = function() {
-      loadSavedSettings(); 
-      loadData();          
-      initAutoRotation();  
-      setInterval(loadData, 60000); 
+    loadSavedSettings(); 
+    loadData();          
+    initAutoRotation();  
+    setInterval(loadData, 60000);
     };
   </script>
 </body>
